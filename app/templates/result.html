@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block title %}Correção · {{ a.title }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+{% set g = to_ten(a.score, a.max_score) %}
+{% if teacher %}
+<p><a href="/teacher/exercises/{{ a.eid }}/results">← Resultados do exercício</a></p>
+{% else %}
+<p><a href="/student">← Meus exercícios</a></p>
+{% endif %}
+{% if a.is_preview %}<div class="flash" style="background:var(--warn-soft);color:#9a6200">Envio de teste (não conta nas notas). <a href="/teacher/exercises/{{ a.eid }}/preview">Testar de novo</a></div>{% endif %}
+<div class="card">
+  <div class="result-hero">
+    <div class="big-grade" style="color:{{ 'var(--ok)' if g >= 7 else ('#9a6200' if g >= 5 else 'var(--bad)') }}">{{ g|grade }}</div>
+    <div style="flex:1">
+      <h1 style="margin:0">{{ a.title }}</h1>
+      <div class="muted">{% if teacher %}<b>{{ a.student }}</b> · {% endif %}{{ a.score|round(2) }} de {{ a.max_score|round(2) }} pontos · enviado em {{ a.created_at|dt }}</div>
+      {% if a.needs_review %}<div style="margin-top:.3rem"><span class="badge warn">⏳ Nota provisória — {{ 'há texto livre para você corrigir' if teacher else 'o professor ainda vai corrigir seu texto' }}</span></div>{% endif %}
+      {% if g >= 9 %}<div style="margin-top:.3rem">🎉 Excellent!</div>{% elif g >= 7 %}<div style="margin-top:.3rem">👏 Great job!</div>{% elif not teacher %}<div style="margin-top:.3rem">💪 Keep practicing!</div>{% endif %}
+    </div>
+    {% if not teacher %}
+    <div class="stack" style="text-align:right">
+      {% if left is none or left > 0 %}
+        <a class="btn primary big" href="/student/exercises/{{ a.eid }}">🔁 Refazer{% if left is not none %} ({{ left }} restante{{ 's' if left != 1 }}){% endif %}</a>
+      {% else %}<span class="badge">Sem tentativas restantes</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% if a.feedback %}<div class="freebox" style="margin-top:1rem"><b>💬 Comentário do professor:</b><br>{{ a.feedback }}</div>{% endif %}
+  {% if not reveal %}<p class="hint" style="margin-bottom:0">As respostas corretas {{ 'serão mostradas quando acabarem suas tentativas' if a.show_answers == 'end' else 'não são mostradas neste exercício' }}. Veja abaixo o que você acertou (✓) e errou (✗).</p>{% endif %}
+</div>
+
+{% if teacher %}<form method="post" action="/teacher/attempts/{{ a.id }}/review">{% endif %}
+{% for it in a['items'] %}
+{% set r = a.res_by_id[it.id] %}
+<section class="card">
+  <div class="q-head">
+    <div class="q-num" style="background:{{ 'var(--ok)' if r.score >= r.points else ('var(--accent)' if r.score > 0 or r.needs_review else 'var(--bad)') }}">{{ loop.index }}</div>
+    <div style="flex:1">{% if it.prompt %}<div class="q-prompt">{{ it.prompt }}</div>{% endif %}<div class="q-type">{{ TYPES[it.type] }}</div></div>
+    <div class="q-score">{{ r.score|round(2) }} / {{ r.points|round(2) }}</div>
+  </div>
+  {% if it.image %}<img class="q-img" src="{{ it.image }}" alt="" referrerpolicy="no-referrer">{% endif %}
+
+  {% if it.type in ('fill', 'dropdown') %}
+    <div class="passage">{% for p in parse_text(it.text) %}{% if p[0] == 't' %}{{ p[1] }}{% else %}{% set d = r.details[p[1]] %}{% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '___' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}{% endif %}{% endfor %}</div>
+
+  {% elif it.type == 'choice' %}
+    <ul class="res-list">{% for o in it.options %}{% set d = r.details[0] %}
+      <li>{% if d.given_index == loop.index0 %}<span class="ans {{ 'ok' if d.ok else 'bad' }}" style="text-decoration:none">{{ '✓' if d.ok else '✗' }} {{ o }}</span> <small class="muted">sua resposta</small>{% elif reveal and it.correct == loop.index0 %}<span class="ans fix">✓ {{ o }}</span> <small class="muted">correta</small>{% else %}{{ o }}{% endif %}</li>
+    {% endfor %}</ul>
+
+  {% elif it.type == 'truefalse' %}
+    <ul class="res-list">{% for d in r.details %}
+      <li class="row spread"><span>{{ d.statement }}</span><span><span class="mark {{ 'ok' if d.ok else 'bad' }}">{{ '✓' if d.ok else '✗' }}</span> {{ 'True' if d.given == true else ('False' if d.given == false else '—') }}{% if reveal and not d.ok %} <span class="ans fix">{{ 'True' if d.expected else 'False' }}</span>{% endif %}</span></li>
+    {% endfor %}</ul>
+
+  {% elif it.type == 'order' %}
+    {% set d = r.details[0] %}
+    <p><span class="ans {{ 'ok' if d.ok else 'bad' }}" style="text-decoration:none">{{ '✓' if d.ok else '✗' }} {{ d.given or '(sem resposta)' }}</span></p>
+    {% if reveal and not d.ok %}<p>Correta: <span class="ans fix">{{ d.expected }}</span></p>{% endif %}
+
+  {% elif it.type == 'match' %}
+    <ul class="res-list">{% for d in r.details %}
+      <li><b>{{ d.left }}</b> → {% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '—' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}</li>
+    {% endfor %}</ul>
+
+  {% elif it.type == 'group' %}
+    <ul class="res-list">{% for d in r.details %}
+      <li><b>{{ d.word }}</b> → {% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '—' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}</li>
+    {% endfor %}</ul>
+
+  {% elif it.type == 'free' %}
+    {% set d = r.details[0] %}
+    <div class="freebox">{{ d.given or '(sem resposta)' }}</div>
+    <p class="hint">{{ d.words }} palavra(s){% if teacher and d.keywords %} · palavras-chave encontradas: {{ d.keywords_found|join(', ') or 'nenhuma' }} de {{ d.keywords|join(', ') }}{% endif %}</p>
+    {% if (reveal or teacher) and d.expected %}<p><b>Resposta modelo:</b></p><div class="freebox" style="background:var(--ok-soft)">{{ d.expected }}</div>{% endif %}
+    {% if teacher %}
+      <div class="row" style="margin-top:.7rem"><label style="margin:0">Nota desta questão (0 a {{ r.points|round(2) }}):</label>
+      <input type="number" name="score_{{ it.id }}" min="0" max="{{ r.points }}" step="0.25" value="{{ r.score }}" style="width:110px">
+      {% if r.reviewed %}<span class="badge ok">corrigida</span>{% else %}<small class="muted">automática: {{ r.auto_score }}</small>{% endif %}</div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endfor %}
+{% if teacher %}
+<div class="card">
+  <h2>Correção do professor</h2>
+  <div class="field"><label>Comentário para o aluno</label><textarea name="feedback" rows="3">{{ a.feedback or '' }}</textarea></div>
+  <button class="btn primary">Salvar correção</button>
+  <span class="hint">Salvar confirma as notas das questões de texto livre.</span>
+</div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row spread"><h1>Professores e administradores</h1><button class="btn primary" onclick="resetT();document.getElementById('tForm').scrollIntoView({behavior:'smooth'})">+ Novo professor(a)</button></div>
+<div class="builder-layout" style="grid-template-columns:1fr 380px">
+  <div class="card table-wrap">
+    <table class="table">
+      <thead><tr><th>Nome</th><th>Login / e-mail</th><th>Perfil</th><th>Turmas</th><th></th></tr></thead>
+      <tbody>
+      {% for t in teachers %}
+      <tr style="{{ 'opacity:.55' if not t.active }}">
+        <td><b>{{ t.name }}</b>{% if not t.active %} <span class="badge">inativo</span>{% endif %}</td>
+        <td><code>{{ t.username }}</code><br><small>{{ t.email or 'sem e-mail' }}</small></td>
+        <td><span class="badge {{ 'bad' if t.role == 'admin' else 'level' }}">{{ ROLES[t.role] }}</span></td>
+        <td>{% if t.role == 'admin' %}<small class="muted">todas</small>{% else %}<div class="tag-list">{% for c in t.classes %}<span class="badge">{{ c.name }}</span>{% else %}<span class="badge warn">nenhuma</span>{% endfor %}</div>{% endif %}</td>
+        <td><div class="row" style="justify-content:flex-end;gap:.3rem">
+          <button class="btn small" onclick='editT({{ {"id": t.id, "name": t.name, "username": t.username, "email": t.email or "", "role": t.role, "active": t.active, "class_ids": t.class_ids}|tojson }})'>Editar</button>
+          {% if t.id != user.id %}<form method="post" action="/users/{{ t.id }}/reset-link"><button class="btn small" title="Gera um link para a pessoa criar nova senha">🔑 Senha</button></form>{% endif %}
+        </div></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form class="card side" method="post" action="/admin/teachers" id="tForm">
+    <h2 id="tTitle">Novo professor(a)</h2>
+    <input type="hidden" name="user_id" value="0">
+    <div class="field"><label>Nome</label><input type="text" name="name" required></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:.5rem">
+      <div class="field"><label>Usuário (login)</label><input type="text" name="username" required autocapitalize="none"></div>
+      <div class="field"><label>Perfil</label><select name="role" onchange="toggleClasses()"><option value="teacher">Professor(a)</option><option value="admin">Administrador(a)</option></select></div>
+    </div>
+    <div class="field"><label>E-mail</label><input type="email" name="email" placeholder="para recuperação de senha"></div>
+    <div class="field"><label>Senha</label><input type="text" name="password" autocomplete="off" minlength="8"><div class="hint" id="pHint">Mínimo 8 caracteres.</div></div>
+    <div class="field" id="classesField"><label>Turmas com acesso</label>
+      <div class="checks">{% for c in classes %}<label><input type="checkbox" name="class_ids" value="{{ c.id }}"> {{ c.name }} <span class="badge level">{{ c.level }}</span></label>{% else %}<span class="hint">Cadastre turmas primeiro.</span>{% endfor %}</div>
+    </div>
+    <div class="field" id="activeField" hidden><label>Situação</label><select name="active"><option value="1">Ativo</option><option value="0">Inativo (não consegue entrar)</option></select></div>
+    <div class="row"><button class="btn primary">Salvar</button><button type="button" class="btn ghost" onclick="resetT()">Limpar</button></div>
+    <p class="hint">Administradores cadastram turmas e professores e têm acesso a tudo.</p>
+  </form>
+</div>
+<script>
+const tf = document.getElementById('tForm');
+function toggleClasses(){ document.getElementById('classesField').hidden = tf.role.value === 'admin'; }
+function editT(t){ tf.user_id.value=t.id; tf.name.value=t.name; tf.username.value=t.username; tf.email.value=t.email; tf.role.value=t.role; tf.active.value=t.active; tf.password.value='';
+  tf.querySelectorAll('[name=class_ids]').forEach(x=>x.checked=t.class_ids.includes(Number(x.value)));
+  document.getElementById('tTitle').textContent='Editar '+t.name; document.getElementById('pHint').textContent='Deixe em branco para manter a senha atual.';
+  document.getElementById('activeField').hidden=false; toggleClasses(); tf.scrollIntoView({behavior:'smooth'}); }
+function resetT(){ tf.reset(); tf.user_id.value=0; document.getElementById('tTitle').textContent='Novo professor(a)'; document.getElementById('pHint').textContent='Mínimo 8 caracteres.'; document.getElementById('activeField').hidden=true; toggleClasses(); }
+</script>
+{% endblock %}

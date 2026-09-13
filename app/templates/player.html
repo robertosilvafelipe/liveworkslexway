@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ ex.title }} · {{ APP_NAME }}{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<p><a href="{{ '/teacher/exercises/' ~ ex.id ~ '/edit' if preview else '/student' }}">← Voltar</a></p>
+{% if preview %}<div class="flash" style="background:var(--warn-soft);color:#9a6200">Modo teste: seu envio não conta como tentativa de aluno.</div>{% endif %}
+<div class="sheet-head">
+  <div class="row" style="margin-bottom:.4rem"><span class="badge">{{ ex.level }}</span><span class="badge">{{ ex.subject }}</span>{% if ex.topic %}<span class="badge">{{ ex.topic }}</span>{% endif %}</div>
+  <h1 style="margin:0">{{ ex.title }}</h1>
+  {% if ex.description %}<p style="margin:.5rem 0 0;white-space:pre-wrap">{{ ex.description }}</p>{% endif %}
+  {% if not preview %}<p style="margin:.6rem 0 0;opacity:.9;font-size:.9rem">Tentativa {{ used + 1 }}{% if left is not none %} de {{ used + left }}{% endif %}{% if ex.due_date %} · prazo {{ ex.due_date|replace('T', ' ') }}{% endif %}</p>{% endif %}
+</div>
+<div id="player"></div>
+<div class="submit-bar">
+  <span id="progress" class="muted"></span>
+  <span class="row"><span id="submitMsg" class="muted"></span><button class="btn primary big" id="submitBtn">Enviar respostas ✓</button></span>
+</div>
+<script>window.PAYLOAD = {{ payload|tojson }};</script>
+{% endblock %}
+{% block scripts %}<script src="/static/player.js?v=2"></script>{% endblock %}

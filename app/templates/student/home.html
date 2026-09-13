@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block content %}
+<div class="row spread" style="margin-bottom:.6rem">
+  <div><h1>Hi, {{ user.name }}! 👋</h1>
+  {% if cls %}<p class="muted" style="margin:0">Turma <b>{{ cls.name }}</b> · nível <span class="badge level">{{ cls.level }}</span></p>{% endif %}</div>
+  {% if cls %}<form method="get"><select name="subject" onchange="this.form.submit()" style="width:auto"><option value="">Todas as matérias</option>{% for s in SUBJECTS %}<option {{ 'selected' if subject == s }}>{{ s }}</option>{% endfor %}</select></form>{% endif %}
+</div>
+{% if not cls %}<div class="card">Você ainda não está em uma turma. Fale com seu professor.</div>{% else %}
+<h2>📌 Para fazer</h2>
+{% if todo %}
+<div class="grid cols-3" style="margin-bottom:1.5rem">
+{% for e in todo %}
+  <div class="card ex-card">
+    <div class="row"><span class="badge level">{{ e.level }}</span><span class="badge">{{ e.subject }}</span>{% if e.topic %}<span class="badge">{{ e.topic }}</span>{% endif %}</div>
+    <h3>{{ e.title }}</h3>
+    {% if e.description %}<p class="muted" style="margin:0">{{ e.description|truncate(110) }}</p>{% endif %}
+    <div class="foot">
+      <small class="muted">{{ e.n_items }} questões{% if e.due_date %} · até {{ e.due_date|replace('T', ' ') }}{% endif %}</small>
+      {% if e.past_due %}<span class="badge bad">Prazo encerrado</span>{% else %}<a class="btn primary" href="/student/exercises/{{ e.id }}">Começar →</a>{% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% else %}<p class="muted card">Nenhum exercício pendente. 🎉</p>{% endif %}
+
+<h2>✅ Já feitos</h2>
+{% if done %}
+<div class="grid cols-3">
+{% for e in done %}
+  <div class="card ex-card">
+    <div class="row"><span class="badge level">{{ e.level }}</span><span class="badge">{{ e.subject }}</span></div>
+    <h3>{{ e.title }}</h3>
+    <div class="row">Nota: {{ grade_pill(e.final, e.pending) }}</div>
+    <div class="foot">
+      <small class="muted">{{ e.used }} tentativa(s){% if e.left is not none %} · {{ e.left }} restante(s){% endif %}</small>
+      <span class="row">
+        <a class="btn small" href="/student/attempts/{{ e.last_attempt }}">Ver correção</a>
+        {% if (e.left is none or e.left > 0) and not e.past_due %}<a class="btn small primary" href="/student/exercises/{{ e.id }}">🔁 Refazer</a>{% endif %}
+      </span>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% else %}<p class="muted card">Você ainda não fez nenhum exercício.</p>{% endif %}
+{% endif %}
+{% endblock %}

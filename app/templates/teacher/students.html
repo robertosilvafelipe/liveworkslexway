@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row spread"><h1>Alunos</h1>
+<form method="get" class="row"><select name="class_id" onchange="this.form.submit()" style="width:auto"><option value="0">Todas as {{ 'turmas' if user.role == 'admin' else 'minhas turmas' }}</option>{% for c in classes %}<option value="{{ c.id }}" {{ 'selected' if c.id == class_id }}>{{ c.name }} ({{ c.level }})</option>{% endfor %}</select></form></div>
+<div class="builder-layout" style="grid-template-columns:1fr 340px">
+  <div class="card table-wrap">
+    <table class="table">
+      <thead><tr><th>Nome</th><th>Usuário</th><th>Turma</th><th class="num">Envios</th><th></th></tr></thead>
+      <tbody>
+      {% for s in students %}
+      <tr style="{{ 'opacity:.5' if not s.active }}">
+        <td><a href="/teacher/students/{{ s.id }}"><b>{{ s.name }}</b></a>{% if not s.active %} <span class="badge">inativo</span>{% endif %}</td>
+        <td><code>{{ s.username }}</code>{% if s.email %}<br><small>{{ s.email }}</small>{% endif %}</td>
+        <td>{% if s.class_name %}{{ s.class_name }} <span class="badge level">{{ s.class_level }}</span>{% else %}<span class="badge warn">sem turma</span>{% endif %}</td>
+        <td class="num">{{ s.attempts }}</td>
+        <td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn small" onclick='editStudent({{ {"id": s.id, "name": s.name, "username": s.username, "email": s.email or "", "class_id": s.class_id or 0, "active": s.active}|tojson }})'>Editar</button>
+        <form method="post" action="/users/{{ s.id }}/reset-link"><button class="btn small" title="Gera um link para o aluno criar nova senha">🔑</button></form></div></td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="muted">Nenhum aluno.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form class="card side" method="post" action="/teacher/students" id="sForm">
+    <h2 id="sTitle">Novo aluno</h2>
+    <input type="hidden" name="student_id" value="0">
+    <div class="field"><label>Nome</label><input type="text" name="name" required></div>
+    <div class="field"><label>Usuário (login)</label><input type="text" name="username" required autocapitalize="none" pattern="[A-Za-z0-9._\-]{3,40}" title="Letras, números, ponto, hífen"></div>
+    <div class="field"><label>E-mail (opcional)</label><input type="email" name="email" placeholder="para recuperar a senha"></div>
+    <div class="field"><label>Senha</label><input type="text" name="password" autocomplete="off"><div class="hint" id="pHint">Mínimo 6 caracteres.</div></div>
+    <div class="field"><label>Turma</label><select name="class_id" {{ 'required' if user.role != 'admin' }}><option value="{{ '0' if user.role == 'admin' else '' }}">— {{ 'sem turma' if user.role == 'admin' else 'escolha' }} —</option>{% for c in classes %}<option value="{{ c.id }}">{{ c.name }} ({{ c.level }})</option>{% endfor %}</select></div>
+    <div class="field" id="activeField" hidden><label>Situação</label><select name="active"><option value="1">Ativo</option><option value="0">Inativo (não consegue entrar)</option></select></div>
+    <div class="row"><button class="btn primary">Salvar</button><button type="reset" class="btn ghost" onclick="resetStudent()">Limpar</button></div>
+  </form>
+</div>
+<script>
+function editStudent(s){const f=document.getElementById('sForm');f.student_id.value=s.id;f.name.value=s.name;f.username.value=s.username;f.email.value=s.email;f.class_id.value=s.class_id;f.active.value=s.active;f.password.value='';
+document.getElementById('sTitle').textContent='Editar aluno';document.getElementById('pHint').textContent='Deixe em branco para manter a senha atual.';document.getElementById('activeField').hidden=false;f.name.focus();}
+function resetStudent(){setTimeout(()=>{const f=document.getElementById('sForm');f.student_id.value=0;document.getElementById('sTitle').textContent='Novo aluno';document.getElementById('pHint').textContent='Mínimo 6 caracteres.';document.getElementById('activeField').hidden=true;});}
+</script>
+{% endblock %}

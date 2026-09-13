@@ -1,0 +1,16 @@
+{% extends "auth_base.html" %}
+{% block title %}Recuperar senha · {{ APP_NAME }}{% endblock %}
+{% block heading %}Recuperar senha{% endblock %}
+{% block sub %}Enviaremos um link para o e-mail cadastrado{% endblock %}
+{% block content %}
+{% if request.query_params.get('sent') %}
+<div class="card"><p style="margin-top:0">📬 Verifique sua caixa de entrada.</p><p class="muted">O link vale por 1 hora. Não recebeu? Confira o spam ou peça ajuda ao seu professor(a) / à escola em <a href="mailto:{{ SCHOOL_EMAIL }}">{{ SCHOOL_EMAIL }}</a>.</p><a class="btn" href="/login">‹ Voltar ao login</a></div>
+{% else %}
+<form class="card" method="post" action="/forgot">
+  <div class="field"><label for="i">Usuário ou e-mail</label><input id="i" type="text" name="identifier" autocapitalize="none" required autofocus></div>
+  <button class="btn primary big" style="width:100%;justify-content:center">Enviar link</button>
+  <p class="hint" style="text-align:center">Alunos sem e-mail cadastrado: peça ao professor(a) um link de redefinição.</p>
+  <p style="text-align:center;margin:.5rem 0 0"><a href="/login">‹ Voltar ao login</a></p>
+</form>
+{% endif %}
+{% endblock %}

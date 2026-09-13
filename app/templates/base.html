@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Text:ital@0;1&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=2">
+<link rel="icon" href="/static/img/favicon.png">
+<meta name="theme-color" content="#005555">
+</head>
+<body>
+{% if user %}
+<header class="topbar"><div class="inner">
+  <a class="logo" href="/"><img src="/static/img/lexway-logo.svg" alt="LexWay"><span class="app">Worksheets</span></a>
+  <nav class="nav">
+  {% set p = request.url.path %}
+  {% if user.role in ('admin', 'teacher') %}
+    <a href="/teacher" class="{{ 'active' if p == '/teacher' }}">Painel</a>
+    <a href="/teacher/exercises" class="{{ 'active' if p.startswith('/teacher/exercises') }}">Atividades</a>
+    {% if user.role == 'admin' %}
+    <a href="/admin/classes" class="{{ 'active' if p.startswith('/admin/classes') }}">Turmas</a>
+    <a href="/admin/teachers" class="{{ 'active' if p.startswith('/admin/teachers') }}">Professores</a>
+    {% else %}
+    <a href="/teacher/classes" class="{{ 'active' if p.startswith('/teacher/classes') }}">Minhas turmas</a>
+    {% endif %}
+    <a href="/teacher/students" class="{{ 'active' if p.startswith('/teacher/students') }}">Alunos</a>
+    <a href="/teacher/gradebook" class="{{ 'active' if p.startswith('/teacher/gradebook') }}">Notas</a>
+  {% else %}
+    <a href="/student" class="{{ 'active' if p == '/student' }}">Minhas atividades</a>
+    <a href="/student/grades" class="{{ 'active' if p.startswith('/student/grades') }}">Minhas notas</a>
+  {% endif %}
+  </nav>
+  <div class="who">
+    <a href="/account" title="Minha conta" style="text-align:right;line-height:1.15"><span class="role-tag">{{ ROLES[user.role] }}</span><br><b>{{ user.name }}</b></a>
+    <form method="post" action="/logout"><button class="btn small">Sair</button></form>
+  </div>
+</div></header>
+{% endif %}
+<main class="wrap {% block wrapclass %}{% endblock %}">
+  {% for kind, msg in messages %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="footer">LexWay English · Inglês 100% online com presença real · <a href="mailto:{{ SCHOOL_EMAIL }}">{{ SCHOOL_EMAIL }}</a></footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

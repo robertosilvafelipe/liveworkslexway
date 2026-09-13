@@ -1,0 +1,21 @@
+[Unit]
+Description=Lisa Worksheets (FastAPI)
+After=network.target
+
+[Service]
+User=worksheets
+Group=worksheets
+WorkingDirectory=/opt/lisa-worksheets
+EnvironmentFile=/etc/lisa-worksheets.env
+ExecStart=/opt/lisa-worksheets/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/lisa-worksheets/data
+PrivateTmp=true
+MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target

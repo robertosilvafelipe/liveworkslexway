@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block content %}
+<div class="row spread" style="margin-bottom:1rem">
+  <h1>Olá, {{ user.name }} 👋</h1>
+  <a class="btn primary" href="/teacher/exercises/new">+ Nova atividade</a>
+</div>
+{% if user.role == 'teacher' and not classes %}<div class="flash error">Você ainda não está vinculada(o) a nenhuma turma. Peça ao administrador da escola.</div>{% endif %}
+<div class="hero-strip">{% if user.role == 'admin' %}Administração da escola — cadastre turmas e professores e acompanhe tudo.{% else %}Suas turmas: {% for c in classes %}{{ c.name }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</div>
+<div class="grid cols-4" style="margin-bottom:1rem">
+  <a class="card" href="{{ '/admin/classes' if user.role == 'admin' else '/teacher/classes' }}"><div class="stat-label">{{ 'Turmas' if user.role == 'admin' else 'Minhas turmas' }}</div><div class="stat">{{ stats.classes }}</div></a>
+  <a class="card" href="/teacher/students"><div class="stat-label">Alunos ativos</div><div class="stat">{{ stats.students }}</div></a>
+  <a class="card" href="/teacher/exercises"><div class="stat-label">Atividades</div><div class="stat">{{ stats.exercises }}</div></a>
+  <div class="card"><div class="stat-label">Para corrigir</div><div class="stat" style="color:{{ 'var(--accent)' if stats.pending else 'inherit' }}">{{ stats.pending }}</div></div>
+</div>
+<div class="grid cols-2">
+  <div class="card">
+    <h2>⏳ Aguardando sua correção</h2>
+    {% if pending %}
+    <table class="table"><tbody>
+    {% for a in pending %}<tr><td><b>{{ a.student }}</b><br><small>{{ a.title }}</small></td><td><small>{{ a.created_at|dt }}</small></td><td><a class="btn small primary" href="/teacher/attempts/{{ a.id }}">Corrigir</a></td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Nada pendente. Respostas de texto livre aparecem aqui.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Envios recentes</h2>
+    {% if recent %}
+    <table class="table"><tbody>
+    {% for a in recent %}<tr><td><b>{{ a.student }}</b><br><small>{{ a.title }}</small></td><td>{{ grade_pill(to_ten(a.score, a.max_score), a.needs_review) }}</td><td><small>{{ a.created_at|dt }}</small></td><td><a href="/teacher/attempts/{{ a.id }}">ver</a></td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Nenhum aluno enviou exercícios ainda.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block content %}
+<p><a href="/teacher/students">← Alunos</a></p>
+<h1>{{ s.name }}</h1>
+<p class="muted">Usuário <code>{{ s.username }}</code> · Turma: {{ s.class_name or 'sem turma' }}</p>
+<div class="card table-wrap">
+  <h2>Histórico de envios</h2>
+  <table class="table">
+    <thead><tr><th>Exercício</th><th>Nível</th><th>Nota</th><th>Data</th><th></th></tr></thead>
+    <tbody>
+    {% for a in attempts %}
+    <tr><td>{{ a.title }} <small class="muted">· {{ a.subject }}</small></td><td><span class="badge level">{{ a.level }}</span></td>
+      <td>{{ grade_pill(to_ten(a.score, a.max_score), a.needs_review) }}</td><td><small>{{ a.created_at|dt }}</small></td><td><a href="/teacher/attempts/{{ a.id }}">ver</a></td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Nenhum envio.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

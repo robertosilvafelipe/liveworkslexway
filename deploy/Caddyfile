@@ -1,0 +1,9 @@
+64-181-168-113.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:8000
+	header Strict-Transport-Security "max-age=31536000"
+}
+
+http://64.181.168.113 {
+	redir https://64-181-168-113.sslip.io{uri} permanent
+}

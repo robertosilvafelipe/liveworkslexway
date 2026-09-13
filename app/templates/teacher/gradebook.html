@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block content %}
+<div class="row spread"><h1>Notas</h1>
+<form method="get" class="row"><select name="class_id" onchange="this.form.submit()" style="width:auto">{% for c in classes %}<option value="{{ c.id }}" {{ 'selected' if cls and c.id == cls.id }}>{{ c.name }} ({{ c.level }})</option>{% endfor %}</select>
+{% if cls %}<a class="btn" href="/teacher/gradebook.csv?class_id={{ cls.id }}">⬇ Exportar CSV</a>{% endif %}</form></div>
+{% if not cls %}<div class="card muted">Crie uma turma primeiro.</div>{% else %}
+<div class="card table-wrap">
+<table class="table gb">
+  <thead><tr><th>Aluno</th>{% for e in exercises %}<th class="ex num"><a href="/teacher/exercises/{{ e.id }}/results">{{ e.title }}</a><br><span class="badge">{{ e.subject }}</span></th>{% endfor %}<th class="num">Feitos</th><th class="num">Média</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td><a href="/teacher/students/{{ r.s.id }}"><b>{{ r.s.name }}</b></a></td>
+  {% for c in r.cells %}<td class="cell">{{ grade_pill(c.grade) if c.n else '<span class="muted">—</span>'|safe }}{{ ' ⏳' if c.pending }}</td>{% endfor %}
+  <td class="num">{{ r.done }}/{{ exercises|length }}</td><td class="num">{{ grade_pill(r.avg) }}</td></tr>
+  {% else %}<tr><td colspan="{{ exercises|length + 3 }}" class="muted">Nenhum aluno nesta turma.</td></tr>{% endfor %}
+  </tbody>
+</table>
+<p class="hint">Notas de 0 a 10. ⏳ = tem texto livre aguardando sua correção (nota provisória).</p>
+</div>
+{% endif %}
+{% endblock %}

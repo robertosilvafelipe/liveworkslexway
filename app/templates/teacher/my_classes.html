@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Minhas turmas</h1>
+{% if not classes %}<div class="card">Você ainda não tem turmas. Peça ao administrador da escola para vincular você a uma turma.</div>{% endif %}
+<div class="grid cols-2">
+{% for c in classes %}
+  <div class="card">
+    <div class="row spread"><h2 style="margin:0">{{ c.name }}</h2><span class="badge level">{{ c.level }}</span></div>
+    {% if c.description %}<p class="muted">{{ c.description }}</p>{% endif %}
+    <p class="hint">Professores: {{ c.teacher_names }}</p>
+    <div class="tag-list" style="margin:.5rem 0 1rem">{% for s in c.students %}<a class="badge" href="/teacher/students/{{ s.id }}">{{ s.name }}</a>{% else %}<span class="muted">Sem alunos.</span>{% endfor %}</div>
+    <div class="row"><a class="btn small" href="/teacher/exercises?class_id={{ c.id }}">Atividades</a><a class="btn small" href="/teacher/students?class_id={{ c.id }}">Alunos</a><a class="btn small" href="/teacher/gradebook?class_id={{ c.id }}">Notas</a></div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

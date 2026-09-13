@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row spread"><h1>Atividades</h1><a class="btn primary" href="/teacher/exercises/new">+ Nova atividade</a></div>
+<form class="row card" method="get" style="padding:.7rem">
+  <select name="level" style="width:auto"><option value="">Todos os níveis</option>{% for l in LEVELS %}<option {{ 'selected' if f.level == l }}>{{ l }}</option>{% endfor %}</select>
+  <select name="subject" style="width:auto"><option value="">Todas as matérias</option>{% for s in SUBJECTS %}<option {{ 'selected' if f.subject == s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="class_id" style="width:auto"><option value="0">Todas as turmas</option>{% for c in classes %}<option value="{{ c.id }}" {{ 'selected' if f.class_id == c.id }}>{{ c.name }}</option>{% endfor %}</select>
+  <button class="btn">Filtrar</button>
+</form>
+<div class="card table-wrap">
+<table class="table">
+  <thead><tr><th>Exercício</th><th>Nível</th><th>Matéria</th><th>Turmas</th><th>Autor</th><th class="num">Questões</th><th class="num">Envios</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for e in exercises %}
+  <tr>
+    <td><a href="/teacher/exercises/{{ e.id }}/edit"><b>{{ e.title }}</b></a>{% if e.topic %}<br><small>{{ e.topic }}</small>{% endif %}</td>
+    <td><span class="badge level">{{ e.level }}</span></td>
+    <td>{{ e.subject }}</td>
+    <td><small>{{ e.class_names or ('Todas do nível ' ~ e.level) }}</small></td><td><small>{{ e.author or '—' }}</small></td>
+    <td class="num">{{ e.n_items }}</td>
+    <td class="num">{{ e.attempts }}</td>
+    <td><form method="post" action="/teacher/exercises/{{ e.id }}/toggle"><button class="badge {{ 'ok' if e.published else '' }}" style="border:0;cursor:pointer" title="Clique para alternar">{{ 'Publicado' if e.published else 'Rascunho' }}</button></form></td>
+    <td class="row" style="justify-content:flex-end;flex-wrap:nowrap">
+      <a class="btn small" href="/teacher/exercises/{{ e.id }}/results">Resultados</a>
+      <a class="btn small" href="/teacher/exercises/{{ e.id }}/preview">Testar</a>
+      <form method="post" action="/teacher/exercises/{{ e.id }}/duplicate"><button class="btn small">Duplicar</button></form>
+      <form method="post" action="/teacher/exercises/{{ e.id }}/delete" onsubmit="return confirm('Excluir o exercício e todas as tentativas dos alunos?')"><button class="btn small danger">Excluir</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="muted">Nenhum exercício encontrado.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

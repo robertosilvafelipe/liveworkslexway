@@ -1,0 +1,15 @@
+{% extends "auth_base.html" %}
+{% block title %}Nova senha · {{ APP_NAME }}{% endblock %}
+{% block heading %}Criar nova senha{% endblock %}
+{% block sub %}{% if reset %}Olá, {{ reset.name }} ({{ reset.username }}){% else %}Link inválido{% endif %}{% endblock %}
+{% block content %}
+{% if reset %}
+<form class="card" method="post" action="/reset/{{ token }}">
+  <div class="field"><label>Nova senha</label><input type="password" name="new" required minlength="8" autocomplete="new-password" autofocus></div>
+  <div class="field"><label>Confirmar nova senha</label><input type="password" name="confirm" required minlength="8" autocomplete="new-password"></div>
+  <button class="btn primary big" style="width:100%;justify-content:center">Salvar nova senha</button>
+</form>
+{% else %}
+<div class="card"><p style="margin-top:0">Este link expirou ou já foi usado.</p><a class="btn primary" href="/forgot">Pedir um novo link</a></div>
+{% endif %}
+{% endblock %}

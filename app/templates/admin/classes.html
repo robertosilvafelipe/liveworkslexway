@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row spread"><h1>Turmas</h1><button class="btn primary" onclick="resetClass();document.getElementById('classForm').scrollIntoView({behavior:'smooth'})">+ Nova turma</button></div>
+<div class="builder-layout" style="grid-template-columns:1fr 360px">
+  <div class="card table-wrap">
+    <table class="table">
+      <thead><tr><th>Turma</th><th>Nível</th><th>Professores</th><th class="num">Alunos</th><th></th></tr></thead>
+      <tbody>
+      {% for c in classes %}
+      <tr>
+        <td><b>{{ c.name }}</b>{% if c.description %}<br><small>{{ c.description }}</small>{% endif %}</td>
+        <td><span class="badge level">{{ c.level }}</span></td>
+        <td>{% if c.teacher_names %}{{ c.teacher_names }}{% else %}<span class="badge warn">sem professor</span>{% endif %}</td>
+        <td class="num"><a href="/teacher/students?class_id={{ c.id }}">{{ c.students }}</a></td>
+        <td><div class="row" style="justify-content:flex-end;gap:.3rem">
+          <a class="btn small" href="/teacher/gradebook?class_id={{ c.id }}">Notas</a>
+          <button class="btn small" onclick='editClass({{ {"id": c.id, "name": c.name, "level": c.level, "description": c.description, "teacher_ids": c.teacher_ids}|tojson }})'>Editar</button>
+          <form method="post" action="/admin/classes/{{ c.id }}/delete" onsubmit="return confirm('Excluir a turma? Os alunos ficarão sem turma.')"><button class="btn small danger">Excluir</button></form>
+        </div></td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="muted">Nenhuma turma ainda.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form class="card side" method="post" action="/admin/classes" id="classForm">
+    <h2 id="classFormTitle">Nova turma</h2>
+    <input type="hidden" name="class_id" value="0">
+    <div class="field"><label>Nome</label><input type="text" name="name" required placeholder="Ex.: A1 — Terça e Quinta 19h"></div>
+    <div class="field"><label>Nível (CEFR)</label><select name="level">{% for l in LEVELS %}<option>{{ l }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Descrição</label><input type="text" name="description"></div>
+    <div class="field"><label>Professores com acesso</label>
+      <div class="checks">{% for t in teachers %}<label><input type="checkbox" name="teacher_ids" value="{{ t.id }}"> {{ t.name }}</label>{% else %}<span class="hint">Cadastre professores em <a href="/admin/teachers">Professores</a>.</span>{% endfor %}</div>
+      <div class="hint">Professores veem e editam as atividades, alunos e notas das turmas marcadas.</div>
+    </div>
+    <div class="row"><button class="btn primary">Salvar turma</button><button type="button" class="btn ghost" onclick="resetClass()">Limpar</button></div>
+  </form>
+</div>
+<script>
+const cf = document.getElementById('classForm');
+function editClass(c){cf.class_id.value=c.id;cf.name.value=c.name;cf.level.value=c.level;cf.description.value=c.description||'';
+  cf.querySelectorAll('[name=teacher_ids]').forEach(x=>x.checked=c.teacher_ids.includes(Number(x.value)));
+  document.getElementById('classFormTitle').textContent='Editar turma';cf.scrollIntoView({behavior:'smooth'});cf.name.focus();}
+function resetClass(){cf.reset();cf.class_id.value=0;document.getElementById('classFormTitle').textContent='Nova turma';}
+</script>
+{% endblock %}

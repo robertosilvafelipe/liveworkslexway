@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros.html" import grade_pill %}
+{% block content %}
+<p><a href="/teacher/exercises">← Atividades</a></p>
+<div class="row spread"><div><h1>{{ ex.title }}</h1><p class="muted"><span class="badge level">{{ ex.level }}</span> {{ ex.subject }} · nota final: {{ GRADING[ex.grading] }} · tentativas: {{ ex.max_attempts or 'ilimitadas' }}</p></div>
+<div class="row"><a class="btn" href="/teacher/exercises/{{ ex.id }}/edit">Editar</a><a class="btn" href="/teacher/exercises/{{ ex.id }}/preview">Testar</a></div></div>
+<div class="card table-wrap">
+<table class="table">
+  <thead><tr><th>Aluno</th><th>Turma</th><th>Nota final</th><th>Tentativas</th><th>Histórico</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td><b>{{ r.s.name }}</b></td><td><small>{{ r.s.class_name }}</small></td>
+    <td>{{ grade_pill(r.final, r.pending) }}</td>
+    <td>{{ r.attempts|length }}{% if r.allowed %} / {{ r.allowed }}{% endif %}</td>
+    <td class="row">{% for a in r.attempts %}<a class="btn small" href="/teacher/attempts/{{ a.id }}" title="{{ a.created_at|dt }}">#{{ loop.index }}: {{ to_ten(a.score, a.max_score)|grade }}{{ '⏳' if a.needs_review }}</a>{% else %}<span class="muted">não fez</span>{% endfor %}</td>
+    <td>{% if r.allowed %}<form method="post" action="/teacher/exercises/{{ ex.id }}/grant"><input type="hidden" name="student_id" value="{{ r.s.id }}"><button class="btn small" title="Libera +1 tentativa para este aluno">+1 retake</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="muted">Nenhum aluno com acesso a este exercício.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/teacher/exercises">← Atividades</a></p>
+<div class="row spread" style="margin-bottom:.8rem">
+  <h1>{{ 'Editar atividade' if ex.id else 'Nova atividade' }}</h1>
+  {% if ex.id %}<div class="row"><a class="btn" href="/teacher/exercises/{{ ex.id }}/preview">▶ Testar como aluno</a><a class="btn" href="/teacher/exercises/{{ ex.id }}/results">Resultados</a></div>{% endif %}
+</div>
+<div class="builder-layout">
+  <div class="card side" id="meta">
+    <div class="field"><label>Título</label><input type="text" data-k="title" placeholder="Ex.: Verb to be — affirmative"></div>
+    <div class="field"><label>Instruções gerais</label><textarea data-k="description" rows="3"></textarea></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:.5rem">
+      <div class="field"><label>Nível</label><select data-k="level">{% for l in LEVELS %}<option>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Matéria</label><select data-k="subject">{% for s in SUBJECTS %}<option>{{ s }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="field"><label>Tópico</label><input type="text" data-k="topic" placeholder="Ex.: Verb to be, Family, Jobs"></div>
+    <div class="field"><label>Turmas</label>
+      <div class="checks">{% for c in classes %}<label><input type="checkbox" class="cls" value="{{ c.id }}"> {{ c.name }} <span class="badge level">{{ c.level }}</span></label>{% endfor %}</div>
+      {% if other_classes %}<div class="hint">Também atribuída a turmas de outros professores: {{ other_classes|join(', ') }} (não será alterado).</div>{% endif %}
+      <div class="hint">{% if user.role == 'admin' %}Nenhuma marcada = disponível para todas as turmas do mesmo nível.{% else %}Marque pelo menos uma das suas turmas.{% endif %}</div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:.5rem">
+      <div class="field"><label>Tentativas</label><input type="number" min="0" max="50" data-k="max_attempts"><div class="hint">0 = ilimitadas</div></div>
+      <div class="field"><label>Nota final</label><select data-k="grading">{% for k, v in GRADING.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="field"><label>Mostrar respostas corretas</label><select data-k="show_answers">{% for k, v in SHOW_ANSWERS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Prazo (opcional)</label><input type="datetime-local" data-k="due_date"></div>
+    <div class="field"><label class="row" style="font-weight:800"><input type="checkbox" data-k="published"> Publicado (visível aos alunos)</label></div>
+    <div id="saveErr" class="flash error" hidden></div>
+    <button class="btn primary big" id="saveBtn" style="width:100%;justify-content:center">💾 Salvar exercício</button>
+    <div class="hint" id="totalPts" style="text-align:center;margin-top:.4rem"></div>
+  </div>
+  <div>
+    <div id="items"></div>
+    <div class="card">
+      <h3>Adicionar questão</h3>
+      <div class="add-bar" id="addBar">{% for k, v in TYPES.items() %}<button class="btn" data-type="{{ k }}">+ {{ v }}</button>{% endfor %}</div>
+    </div>
+  </div>
+</div>
+<script>window.EX = {{ ex|tojson }}; window.TYPES = {{ TYPES|tojson }};</script>
+{% endblock %}
+{% block scripts %}<script src="/static/builder.js?v=2"></script>{% endblock %}

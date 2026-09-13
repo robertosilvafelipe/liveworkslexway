@@ -1,0 +1,10 @@
+{% extends "auth_base.html" %}
+{% block title %}Entrar · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<form class="card" method="post" action="/login">
+  <div class="field"><label for="u">Usuário ou e-mail</label><input id="u" type="text" name="username" autocomplete="username" autocapitalize="none" required autofocus></div>
+  <div class="field"><label for="p">Senha</label><input id="p" type="password" name="password" autocomplete="current-password" required></div>
+  <button class="btn primary big" style="width:100%;justify-content:center">Entrar ›</button>
+  <p style="text-align:center;margin:.9rem 0 0"><a href="/forgot">Esqueci minha senha</a></p>
+</form>
+{% endblock %}

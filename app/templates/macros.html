@@ -1,0 +1,3 @@
+{% macro grade_pill(g, pending=False) -%}
+{% if g is none %}<span class="grade-pill">—</span>{% else %}<span class="grade-pill {{ 'hi' if g >= 7 else ('mid' if g >= 5 else 'lo') }}">{{ g|grade }}</span>{% endif %}{% if pending %} <span class="badge warn" title="Aguardando correção do professor">⏳ revisão</span>{% endif %}
+{%- endmacro %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Link de redefinição de senha</h1>
+<div class="card stack">
+  <p style="margin:0">Para <b>{{ target.name }}</b> (<code>{{ target.username }}</code>) · válido por {{ hours }} horas · uso único.</p>
+  {% if emailed %}<div class="flash" style="margin:0">📧 Também enviamos este link para {{ target.email }}.</div>{% endif %}
+  <div class="link-box" id="lnk">{{ url }}</div>
+  <div class="row"><button class="btn teal" onclick="navigator.clipboard.writeText(document.getElementById('lnk').innerText);this.textContent='Copiado ✓'">Copiar link</button>
+  <a class="btn" href="{{ '/admin/teachers' if target.role != 'student' else '/teacher/students' }}">‹ Voltar</a></div>
+  <p class="hint">Envie por WhatsApp ou e-mail. Este link não aparece de novo depois que você sair desta página.</p>
+</div>
+{% endblock %}
