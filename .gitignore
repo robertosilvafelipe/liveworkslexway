@@ -8,3 +8,7 @@ data/
 .env
 *.env
 !.env.example
+
+# Mídia das aulas (~600 MB): fica só no servidor e no backup do notebook (~/bin/lisa-backup).
+app/static/audio/**/*.m4a
+app/static/video/**/*.mp4

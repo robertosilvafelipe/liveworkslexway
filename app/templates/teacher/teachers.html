@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Professores</h1>
+<div class="grid cols-2">
+  <div class="card"><table class="table"><thead><tr><th>Nome</th><th>Usuário</th><th>Desde</th></tr></thead><tbody>
+  {% for t in teachers %}<tr><td><b>{{ t.name }}</b></td><td><code>{{ t.username }}</code></td><td><small>{{ t.created_at|dt(False) }}</small></td></tr>{% endfor %}
+  </tbody></table></div>
+  <form class="card" method="post" action="/teacher/teachers">
+    <h2>Adicionar professor(a)</h2>
+    <div class="field"><label>Nome</label><input type="text" name="name" required></div>
+    <div class="field"><label>Usuário</label><input type="text" name="username" required autocapitalize="none"></div>
+    <div class="field"><label>Senha</label><input type="text" name="password" required minlength="6" autocomplete="off"></div>
+    <button class="btn primary">Criar</button>
+  </form>
+</div>
+{% endblock %}

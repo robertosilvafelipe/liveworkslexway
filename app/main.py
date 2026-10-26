@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import logging
+import mimetypes
 import os
 import re
 import secrets
@@ -18,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import db, grading, mailer
+from . import curriculum, db, grading, mailer
 from .auth import hash_password, verify_password
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -33,6 +34,10 @@ SCHOOL_EMAIL = os.environ.get("WS_SCHOOL_EMAIL", "lexway.english@gmail.com")
 RESET_MINUTES = 60
 RESET_ADMIN_HOURS = 72
 ROLES = {"admin": "Administrador(a)", "teacher": "Professor(a)", "student": "Aluno(a)"}
+
+# listening audios: some servers have no MIME entry for these, and nosniff then blocks playback
+mimetypes.add_type("audio/mp4", ".m4a")
+mimetypes.add_type("audio/mpeg", ".mp3")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=SECRET, session_cookie="ws_session", max_age=60 * 60 * 24 * 14,
@@ -91,6 +96,8 @@ def fmt_grade(v):
 
 templates.env.filters["dt"] = fmt_dt
 templates.env.filters["grade"] = fmt_grade
+templates.env.filters["plain_title"] = lambda t: (lambda r: r[:1].upper() + r[1:])(
+    re.sub(r"^(Grammar|Vocabulary|Listening|Speaking|Reading|Writing|Video)\s*[—–-]\s*", "", t or "", flags=re.I))
 templates.env.globals.update(TYPES=grading.TYPES, LEVELS=grading.LEVELS, SUBJECTS=grading.SUBJECTS,
                              GRADING=grading.GRADING, SHOW_ANSWERS=grading.SHOW_ANSWERS, APP_NAME=APP_NAME,
                              ROLES=ROLES, SCHOOL_EMAIL=SCHOOL_EMAIL,
@@ -165,6 +172,13 @@ def clean_username(v):
     if not re.match(r"^[a-z0-9._-]{3,40}$", v):
         raise ValueError("Usuário deve ter 3 a 40 caracteres: letras, números, ponto, hífen ou _.")
     return v
+
+
+def clean_slug(v):
+    v = (v or "").strip().lower()
+    if v and not re.match(r"^[a-z0-9][a-z0-9-]{2,59}$", v):
+        raise ValueError("Link público deve ter 3 a 60 caracteres: letras minúsculas, números e hífen (ex.: past-perfect).")
+    return v or None
 
 
 def unique_or_error(username, email, user_id=0):
@@ -262,7 +276,7 @@ VISIBLE_SQL = """
 SELECT e.* FROM exercises e
 WHERE e.published=1 AND (
   EXISTS (SELECT 1 FROM exercise_classes ec WHERE ec.exercise_id=e.id AND ec.class_id=:cid)
-  OR (NOT EXISTS (SELECT 1 FROM exercise_classes ec WHERE ec.exercise_id=e.id) AND e.level=:level)
+  OR (NOT EXISTS (SELECT 1 FROM exercise_classes ec WHERE ec.exercise_id=e.id) AND e.level=:level AND e.public_slug IS NULL)
 )
 """
 
@@ -740,7 +754,8 @@ def _editor(request, u, ex):
 def exercise_new(request: Request):
     u = need(request, *STAFF)
     ex = {"id": 0, "title": "", "description": "", "subject": "Grammar", "topic": "", "level": "A1", "items": [],
-          "max_attempts": 3, "grading": "best", "show_answers": "end", "published": 0, "due_date": "", "class_ids": []}
+          "max_attempts": 3, "grading": "best", "show_answers": "end", "published": 0, "due_date": "", "class_ids": [],
+          "public_slug": "", "public_lesson": ""}
     return _editor(request, u, ex)
 
 
@@ -770,6 +785,10 @@ async def exercise_save(request: Request):
         due = str(data.get("due_date") or "").strip() or None
         if due:
             datetime.fromisoformat(due)
+        public_slug = clean_slug(data.get("public_slug"))
+        public_lesson = max(1, min(200, int(data.get("public_lesson")))) if public_slug and data.get("public_lesson") not in (None, "") else None
+        if public_slug and not is_admin(u):
+            raise ValueError("Só a administração pode colocar atividades em uma página pública.")
         requested = {int(c) for c in data.get("class_ids", [])}
         mine = my_class_ids(u)
         if not is_admin(u) and requested - mine:
@@ -781,21 +800,25 @@ async def exercise_save(request: Request):
                 raise ValueError("Exercício fora das suas turmas.")
             if not is_admin(u):
                 keep = set(existing["class_ids"]) - mine  # assignments to other teachers' classes stay untouched
+                public_slug, public_lesson = existing.get("public_slug"), existing.get("public_lesson")  # only admins change the public page
         final_classes = requested | keep
-        if not is_admin(u) and not final_classes:
+        if not is_admin(u) and not final_classes and not public_slug:
             raise ValueError("Selecione pelo menos uma das suas turmas.")
     except (ValueError, TypeError) as e:
         return JSONResponse({"error": str(e) if str(e) else "Dados inválidos."}, status_code=400)
 
     values = (title, str(data.get("description", "")).strip()[:3000], subject, str(data.get("topic", "")).strip()[:120],
-              level, json.dumps(items, ensure_ascii=False), max_attempts, gpolicy, show, 1 if data.get("published") else 0, due)
+              level, json.dumps(items, ensure_ascii=False), max_attempts, gpolicy, show, 1 if data.get("published") else 0, due,
+              public_slug, public_lesson)
     with db.conn() as c:
         if eid:
             c.execute("""UPDATE exercises SET title=?, description=?, subject=?, topic=?, level=?, items=?, max_attempts=?,
-                         grading=?, show_answers=?, published=?, due_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""", values + (eid,))
+                         grading=?, show_answers=?, published=?, due_date=?, public_slug=?, public_lesson=?, updated_at=CURRENT_TIMESTAMP
+                         WHERE id=?""", values + (eid,))
         else:
             eid = c.execute("""INSERT INTO exercises (title, description, subject, topic, level, items, max_attempts, grading,
-                               show_answers, published, due_date, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", values + (u["id"],)).lastrowid
+                               show_answers, published, due_date, public_slug, public_lesson, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            values + (u["id"],)).lastrowid
         c.execute("DELETE FROM exercise_classes WHERE exercise_id=?", (eid,))
         for cid in final_classes:
             c.execute("INSERT OR IGNORE INTO exercise_classes SELECT ?, id FROM classes WHERE id=?", (eid, cid))
@@ -1082,3 +1105,105 @@ def student_grades(request: Request):
             grades.append(g)
     avg = round(sum(grades) / len(grades), 1) if grades else None
     return render(request, "student/grades.html", u, cls=cls, rows=rows, avg=avg)
+
+
+# ======================================================================
+# public course pages (no login) — e.g. extra practice for course buyers
+# ======================================================================
+
+def course_title(slug):
+    c = curriculum.COURSES.get(slug)
+    return c["title"] if c else {"past-perfect": "Past Perfect"}.get(slug) or slug.replace("-", " ").title()
+
+
+def public_exercises(slug):
+    return db.all("SELECT * FROM exercises WHERE public_slug=? AND published=1 ORDER BY id", (slug,))
+
+
+def public_exercise(slug, eid):
+    ex = load_exercise(eid)
+    if not ex or ex["public_slug"] != slug or not ex["published"]:
+        return None
+    return ex
+
+
+def public_back_url(slug, ex):
+    if ex.get("public_lesson") and curriculum.lesson_title(slug, ex["public_lesson"]):
+        return f"/curso/{slug}/aula/{ex['public_lesson']}"
+    return f"/curso/{slug}"
+
+
+def public_not_found(request):
+    return templates.TemplateResponse(request, "public/course.html", {"user": None, "messages": [], "slug": None, "public": True,
+                                      "title": "Página não encontrada", "exercises": []}, status_code=404)
+
+
+def catalogue_page(request, slug, lesson):
+    exercises = public_exercises(slug)
+    for e in exercises:
+        e["n_items"] = len(json.loads(e["items"]))
+    counts = {}
+    for e in exercises:
+        counts[e["public_lesson"]] = counts.get(e["public_lesson"], 0) + 1
+    menu = [{"n": n, "title": t, "count": counts.get(n, 0)} for n, t in curriculum.lessons(slug)]
+    return render(request, "public/catalogue.html", public=True, slug=slug, courses=curriculum.COURSES, menu=menu,
+                  lesson=lesson, lesson_label=curriculum.lesson_title(slug, lesson),
+                  exercises=[e for e in exercises if e["public_lesson"] == lesson], title=course_title(slug))
+
+
+@app.get("/curso/{slug}", response_class=HTMLResponse)
+def public_course(request: Request, slug: str):
+    if slug in curriculum.COURSES:
+        return catalogue_page(request, slug, 1)
+    exercises = public_exercises(slug)
+    if not exercises:
+        return public_not_found(request)
+    for e in exercises:
+        e["n_items"] = len(json.loads(e["items"]))
+    return render(request, "public/course.html", public=True, slug=slug, title=course_title(slug), exercises=exercises)
+
+
+@app.get("/curso/{slug}/aula/{n}", response_class=HTMLResponse)
+def public_lesson(request: Request, slug: str, n: int):
+    if not curriculum.lesson_title(slug, n):
+        return public_not_found(request)
+    return catalogue_page(request, slug, n)
+
+
+@app.get("/curso/{slug}/{eid}", response_class=HTMLResponse)
+def public_player(request: Request, slug: str, eid: int):
+    ex = public_exercise(slug, eid)
+    if not ex:
+        return public_not_found(request)
+    payload = {"items": [grading.student_item(i) for i in ex["items"]], "submitUrl": f"/curso/{slug}/{eid}/enviar"}
+    return render(request, "player.html", ex=ex, payload=payload, preview=False, public=True, slug=slug, left=None, used=0,
+                  back_url=public_back_url(slug, ex))
+
+
+@app.post("/curso/{slug}/{eid}/enviar")
+async def public_submit(request: Request, slug: str, eid: int):
+    key = "public:" + client_ip(request)
+    if rate_limited(key, 60, 600):
+        return JSONResponse({"error": "Muitos envios seguidos. Aguarde alguns minutos."}, status_code=429)
+    hit(key)
+    ex = public_exercise(slug, eid)
+    if not ex:
+        return JSONResponse({"error": "Exercício indisponível."}, status_code=404)
+    answers = (await request.json()).get("answers", {})
+    res = grading.grade_exercise(ex["items"], answers)
+    token = secrets.token_urlsafe(16)
+    db.run("""INSERT INTO public_attempts (token, exercise_id, items_snapshot, answers, results, score, max_score)
+              VALUES (?,?,?,?,?,?,?)""", (token, eid, json.dumps(ex["items"], ensure_ascii=False),
+                                         json.dumps(answers, ensure_ascii=False), json.dumps(res, ensure_ascii=False),
+                                         res["score"], res["max_score"]))
+    return {"redirect": f"/curso/{slug}/resultado/{token}"}
+
+
+@app.get("/curso/{slug}/resultado/{token}", response_class=HTMLResponse)
+def public_result(request: Request, slug: str, token: str):
+    a = db.one("""SELECT p.*, e.title, e.level, e.subject, e.id eid, e.show_answers, e.public_lesson, '' feedback, 0 needs_review
+                  FROM public_attempts p JOIN exercises e ON e.id=p.exercise_id WHERE p.token=? AND e.public_slug=?""", (token, slug))
+    if not a:
+        return public_not_found(request)
+    return render(request, "result.html", a=attempt_context(a), reveal=a["show_answers"] != "never", teacher=False,
+                  public=True, slug=slug, left=None, back_url=public_back_url(slug, a))

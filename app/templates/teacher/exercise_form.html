@@ -25,6 +25,9 @@
     </div>
     <div class="field"><label>Mostrar respostas corretas</label><select data-k="show_answers">{% for k, v in SHOW_ANSWERS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
     <div class="field"><label>Prazo (opcional)</label><input type="datetime-local" data-k="due_date"></div>
+    {% if user.role == 'admin' %}<div class="field"><label>Página pública (curso)</label><input type="text" data-k="public_slug" placeholder="Ex.: basico-1">
+      <div class="row" style="margin-top:.4rem"><label style="margin:0">Aula nº</label><input type="number" min="1" max="200" data-k="public_lesson" style="width:90px"></div>
+      <div class="hint">Opcional. Coloca a atividade na página aberta, sem login, em /curso/&lt;nome&gt;.{% if ex.public_slug %} Link: <a href="/curso/{{ ex.public_slug }}" target="_blank">/curso/{{ ex.public_slug }}</a>{% endif %}</div></div>{% endif %}
     <div class="field"><label class="row" style="font-weight:800"><input type="checkbox" data-k="published"> Publicado (visível aos alunos)</label></div>
     <div id="saveErr" class="flash error" hidden></div>
     <button class="btn primary big" id="saveBtn" style="width:100%;justify-content:center">💾 Salvar exercício</button>
@@ -40,4 +43,4 @@
 </div>
 <script>window.EX = {{ ex|tojson }}; window.TYPES = {{ TYPES|tojson }};</script>
 {% endblock %}
-{% block scripts %}<script src="/static/builder.js?v=2"></script>{% endblock %}
+{% block scripts %}<script src="/static/builder.js?v=5"></script>{% endblock %}

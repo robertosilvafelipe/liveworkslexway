@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson_label }} · {{ title }} · LexWay English{% endblock %}
+{% block content %}
+{% include "public/_brand.html" %}
+<nav class="course-tabs" aria-label="Cursos">
+  {% for cslug, c in courses.items() %}<a href="/curso/{{ cslug }}" class="{{ 'active' if cslug == slug }}">{{ c.title }}</a>{% endfor %}
+</nav>
+<div class="course-layout">
+  <nav class="lesson-menu card" aria-label="Aulas de {{ title }}">
+    <div class="lesson-menu-title">{{ title }} · {{ menu|length }} aulas</div>
+    {% for m in menu %}
+    <a href="/curso/{{ slug }}/aula/{{ m.n }}" class="{{ 'active' if m.n == lesson }}{{ ' empty' if not m.count }}"{% if m.n == lesson %} aria-current="page"{% endif %}>
+      <span class="n">{{ '%02d'|format(m.n) }}</span><span class="t">{{ m.title }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+  <section>
+    <div class="sheet-head">
+      <div class="row" style="margin-bottom:.4rem"><span class="badge">{{ title }}</span><span class="badge">Aula {{ '%02d'|format(lesson) }} de {{ menu|length }}</span></div>
+      <h1 style="margin:0">{{ menu[lesson - 1].title }}</h1>
+      <p style="margin:.5rem 0 0">Pratique o que você viu nesta aula: faça uma atividade por dia, da Atividade 1 à Atividade 6. No 7º dia, assista à próxima aula! Você pode refazer as atividades quantas vezes quiser, e a correção aparece na hora.{% if exercises|selectattr('subject', 'equalto', 'Video')|list %} A Atividade 7 é extra, para quando quiser praticar mais.{% endif %}</p>
+    </div>
+    {% if exercises %}
+    <div class="grid cols-2">
+    {% set day = namespace(n=0) %}
+    {% for e in exercises %}
+      {% set extra = e.subject == 'Video' %}{% set day.n = day.n + 1 %}
+      <div class="card ex-card{{ ' extra' if extra }}">
+        <div class="row"><span class="badge{{ ' extra' if extra }}">Atividade {{ day.n }}</span></div>
+        <h3>{{ e.title|plain_title }}</h3>
+        {% if e.description %}<p class="muted" style="margin:0">{{ e.description|truncate(140) }}</p>{% endif %}
+        <div class="foot">
+          <small class="muted">{{ e.n_items }} questões</small>
+          <a class="btn primary" href="/curso/{{ slug }}/{{ e.id }}">Começar →</a>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    {% else %}
+    <div class="card"><h3 style="margin:0 0 .3rem">Exercícios em breve ⏳</h3><p class="muted" style="margin:0">As atividades desta aula ainda estão sendo preparadas. Enquanto isso, revise o vídeo da aula!</p></div>
+    {% endif %}
+    <div class="row spread lesson-pager">
+      {% if lesson > 1 %}<a class="btn" href="/curso/{{ slug }}/aula/{{ lesson - 1 }}">← Aula {{ '%02d'|format(lesson - 1) }}</a>{% else %}<span></span>{% endif %}
+      {% if lesson < menu|length %}<a class="btn" href="/curso/{{ slug }}/aula/{{ lesson + 1 }}">Aula {{ '%02d'|format(lesson + 1) }} →</a>{% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+  // keep the current lesson visible in the menu (it scrolls sideways on phones, vertically on desktop)
+  const cur = document.querySelector('.lesson-menu a.active');
+  if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
+  window.scrollTo(0, 0);
+</script>{% endblock %}

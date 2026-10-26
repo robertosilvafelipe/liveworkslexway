@@ -16,7 +16,7 @@
     <td><a href="/teacher/exercises/{{ e.id }}/edit"><b>{{ e.title }}</b></a>{% if e.topic %}<br><small>{{ e.topic }}</small>{% endif %}</td>
     <td><span class="badge level">{{ e.level }}</span></td>
     <td>{{ e.subject }}</td>
-    <td><small>{{ e.class_names or ('Todas do nível ' ~ e.level) }}</small></td><td><small>{{ e.author or '—' }}</small></td>
+    <td><small>{% if e.public_slug %}<a href="/curso/{{ e.public_slug }}" target="_blank" class="badge">🌐 /curso/{{ e.public_slug }}{% if e.public_lesson %} · aula {{ e.public_lesson }}{% endif %}</a><br>{% endif %}{{ e.class_names or ('' if e.public_slug else 'Todas do nível ' ~ e.level) }}</small></td><td><small>{{ e.author or '—' }}</small></td>
     <td class="num">{{ e.n_items }}</td>
     <td class="num">{{ e.attempts }}</td>
     <td><form method="post" action="/teacher/exercises/{{ e.id }}/toggle"><button class="badge {{ 'ok' if e.published else '' }}" style="border:0;cursor:pointer" title="Clique para alternar">{{ 'Publicado' if e.published else 'Rascunho' }}</button></form></td>

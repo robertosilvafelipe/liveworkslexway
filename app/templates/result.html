@@ -6,6 +6,8 @@
 {% set g = to_ten(a.score, a.max_score) %}
 {% if teacher %}
 <p><a href="/teacher/exercises/{{ a.eid }}/results">← Resultados do exercício</a></p>
+{% elif public %}
+{% include "public/_brand.html" %}<p><a href="{{ back_url }}">← Voltar para a aula</a></p>
 {% else %}
 <p><a href="/student">← Meus exercícios</a></p>
 {% endif %}
@@ -15,13 +17,15 @@
     <div class="big-grade" style="color:{{ 'var(--ok)' if g >= 7 else ('#9a6200' if g >= 5 else 'var(--bad)') }}">{{ g|grade }}</div>
     <div style="flex:1">
       <h1 style="margin:0">{{ a.title }}</h1>
-      <div class="muted">{% if teacher %}<b>{{ a.student }}</b> · {% endif %}{{ a.score|round(2) }} de {{ a.max_score|round(2) }} pontos · enviado em {{ a.created_at|dt }}</div>
+      <div class="muted">{% if teacher %}<b>{{ a.student }}</b> · {% endif %}{{ a.score|round(2) }} de {{ a.max_score|round(2) }} pontos {% if not public %}· enviado em {{ a.created_at|dt }}{% endif %}</div>
       {% if a.needs_review %}<div style="margin-top:.3rem"><span class="badge warn">⏳ Nota provisória — {{ 'há texto livre para você corrigir' if teacher else 'o professor ainda vai corrigir seu texto' }}</span></div>{% endif %}
       {% if g >= 9 %}<div style="margin-top:.3rem">🎉 Excellent!</div>{% elif g >= 7 %}<div style="margin-top:.3rem">👏 Great job!</div>{% elif not teacher %}<div style="margin-top:.3rem">💪 Keep practicing!</div>{% endif %}
     </div>
     {% if not teacher %}
     <div class="stack" style="text-align:right">
-      {% if left is none or left > 0 %}
+      {% if public %}
+        <a class="btn primary big" href="/curso/{{ slug }}/{{ a.eid }}">🔁 Fazer de novo</a>
+      {% elif left is none or left > 0 %}
         <a class="btn primary big" href="/student/exercises/{{ a.eid }}">🔁 Refazer{% if left is not none %} ({{ left }} restante{{ 's' if left != 1 }}){% endif %}</a>
       {% else %}<span class="badge">Sem tentativas restantes</span>{% endif %}
     </div>
@@ -32,15 +36,24 @@
 </div>
 
 {% if teacher %}<form method="post" action="/teacher/attempts/{{ a.id }}/review">{% endif %}
+{% set qn = namespace(n=0) %}
 {% for it in a['items'] %}
 {% set r = a.res_by_id[it.id] %}
+{% if it.type == 'info' %}
+<section class="card q info">
+  <div class="q-head"><div class="q-num info">📖</div><div style="flex:1">{% if it.prompt %}<div class="q-prompt">{{ it.prompt }}</div>{% endif %}{% if it.translation %}<div class="q-translation">{{ it.translation }}</div>{% endif %}</div></div>
+  {% if it.text %}<div class="reading">{{ it.text }}</div>{% endif %}
+</section>
+{% else %}
+{% set qn.n = qn.n + 1 %}
 <section class="card">
   <div class="q-head">
-    <div class="q-num" style="background:{{ 'var(--ok)' if r.score >= r.points else ('var(--accent)' if r.score > 0 or r.needs_review else 'var(--bad)') }}">{{ loop.index }}</div>
-    <div style="flex:1">{% if it.prompt %}<div class="q-prompt">{{ it.prompt }}</div>{% endif %}<div class="q-type">{{ TYPES[it.type] }}</div></div>
+    <div class="q-num" style="background:{{ 'var(--ok)' if r.score >= r.points else ('var(--accent)' if r.score > 0 or r.needs_review else 'var(--bad)') }}">{{ qn.n }}</div>
+    <div style="flex:1">{% if it.prompt %}<div class="q-prompt">{{ it.prompt }}</div>{% endif %}{% if it.translation %}<div class="q-translation">{{ it.translation }}</div>{% endif %}<div class="q-type">{{ TYPES[it.type] }}</div></div>
     <div class="q-score">{{ r.score|round(2) }} / {{ r.points|round(2) }}</div>
   </div>
   {% if it.image %}<img class="q-img" src="{{ it.image }}" alt="" referrerpolicy="no-referrer">{% endif %}
+  {% if it.audio %}<audio class="q-audio" src="{{ it.audio }}" controls preload="none"></audio>{% endif %}
 
   {% if it.type in ('fill', 'dropdown') %}
     <div class="passage">{% for p in parse_text(it.text) %}{% if p[0] == 't' %}{{ p[1] }}{% else %}{% set d = r.details[p[1]] %}{% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '___' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}{% endif %}{% endfor %}</div>
@@ -52,7 +65,7 @@
 
   {% elif it.type == 'truefalse' %}
     <ul class="res-list">{% for d in r.details %}
-      <li class="row spread"><span>{{ d.statement }}</span><span><span class="mark {{ 'ok' if d.ok else 'bad' }}">{{ '✓' if d.ok else '✗' }}</span> {{ 'True' if d.given == true else ('False' if d.given == false else '—') }}{% if reveal and not d.ok %} <span class="ans fix">{{ 'True' if d.expected else 'False' }}</span>{% endif %}</span></li>
+      <li class="row spread"><span>{{ d.statement }}{% if d.translation %}<small class="tf-tr">{{ d.translation }}</small>{% endif %}</span><span><span class="mark {{ 'ok' if d.ok else 'bad' }}">{{ '✓' if d.ok else '✗' }}</span> {{ 'True' if d.given == true else ('False' if d.given == false else '—') }}{% if reveal and not d.ok %} <span class="ans fix">{{ 'True' if d.expected else 'False' }}</span>{% endif %}</span></li>
     {% endfor %}</ul>
 
   {% elif it.type == 'order' %}
@@ -62,7 +75,8 @@
 
   {% elif it.type == 'match' %}
     <ul class="res-list">{% for d in r.details %}
-      <li><b>{{ d.left }}</b> → {% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '—' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}</li>
+      {% set given = '<img class="res-pic" src="%s" alt="%s">'|format(d.given_image|e, d.given|e)|safe if d.given_image else d.given %}
+      <li><b>{{ d.left }}</b> → {% if d.ok %}<span class="ans ok">{{ given }} ✓</span>{% else %}<span class="ans bad">{{ given or '—' }}</span>{% if reveal %}<span class="ans fix">{% if d.expected_image %}<img class="res-pic" src="{{ d.expected_image }}" alt="{{ d.expected }}">{% else %}{{ d.expected }}{% endif %}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}</li>
     {% endfor %}</ul>
 
   {% elif it.type == 'group' %}
@@ -74,14 +88,30 @@
     {% set d = r.details[0] %}
     <div class="freebox">{{ d.given or '(sem resposta)' }}</div>
     <p class="hint">{{ d.words }} palavra(s){% if teacher and d.keywords %} · palavras-chave encontradas: {{ d.keywords_found|join(', ') or 'nenhuma' }} de {{ d.keywords|join(', ') }}{% endif %}</p>
+    {% if public and d.keywords and d.given %}{% set missing = d.keywords|reject('in', d.keywords_found)|list %}
+    <p class="hint">{% if d.keywords_found %}✅ Você usou: <b>{{ d.keywords_found|join(', ') }}</b>{% endif %}{% if missing %}{% if d.keywords_found %} · {% endif %}✍️ Tente usar também: <b>{{ missing|join(', ') }}</b>{% endif %}
+    · Compare o seu texto com o modelo abaixo. A nota do texto é uma estimativa automática.</p>{% endif %}
     {% if (reveal or teacher) and d.expected %}<p><b>Resposta modelo:</b></p><div class="freebox" style="background:var(--ok-soft)">{{ d.expected }}</div>{% endif %}
     {% if teacher %}
       <div class="row" style="margin-top:.7rem"><label style="margin:0">Nota desta questão (0 a {{ r.points|round(2) }}):</label>
       <input type="number" name="score_{{ it.id }}" min="0" max="{{ r.points }}" step="0.25" value="{{ r.score }}" style="width:110px">
       {% if r.reviewed %}<span class="badge ok">corrigida</span>{% else %}<small class="muted">automática: {{ r.auto_score }}</small>{% endif %}</div>
     {% endif %}
+
+  {% elif it.type == 'video' %}
+    {% if it.video %}<video class="q-video" src="{{ it.video }}" controls playsinline preload="metadata"{% if it.poster %} poster="{{ it.poster }}"{% endif %}>{% if it.subtitles %}<track kind="subtitles" srclang="en" label="English" src="{{ it.subtitles }}">{% endif %}</video>{% endif %}
+    <ul class="res-list">{% for d in r.details %}
+      <li class="row spread"><span><small class="muted">⏸ {{ '%d:%02d'|format((d.at // 60)|int, (d.at % 60)|int) }}</small> {{ d.statement }}{% if d.translation %}<small class="tf-tr">{{ d.translation }}</small>{% endif %}</span><span>{% if d.ok %}<span class="ans ok">{{ d.given }} ✓</span>{% else %}<span class="ans bad">{{ d.given or '—' }}</span>{% if reveal %}<span class="ans fix">{{ d.expected }}</span>{% else %}<span class="mark bad"> ✗</span>{% endif %}{% endif %}</span></li>
+    {% endfor %}</ul>
+
+  {% elif it.type == 'speak' %}
+    <ul class="res-list">{% for d in r.details %}{% set p = it.phrases[loop.index0] %}
+      <li class="row spread"><span><b>{{ d.text }}</b>{% if d.heard %}<br><small class="muted">o navegador entendeu: “{{ d.heard }}”{{ ' ✓' if d.match }}</small>{% endif %}</span>
+        <span class="row">{% if p.audio %}<audio src="{{ p.audio }}" controls preload="none" style="height:32px;max-width:200px"></audio>{% endif %}<span class="mark {{ 'ok' if d.recorded else 'bad' }}">{{ '✓ gravado' if d.recorded else '✗ não gravado' }}</span></span></li>
+    {% endfor %}</ul>
   {% endif %}
 </section>
+{% endif %}
 {% endfor %}
 {% if teacher %}
 <div class="card">

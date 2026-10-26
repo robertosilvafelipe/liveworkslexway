@@ -102,7 +102,27 @@ CREATE TABLE IF NOT EXISTS password_resets (
     used_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS public_attempts (
+    id INTEGER PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    exercise_id INTEGER NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+    items_snapshot TEXT NOT NULL,
+    answers TEXT NOT NULL,
+    results TEXT NOT NULL,
+    score REAL NOT NULL,
+    max_score REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
+
+
+def _migrate_exercises(c):
+    """v3: exercises can belong to a public (no-login) course page (slug) and to one of its lessons (number)."""
+    cols = [r["name"] for r in c.execute("PRAGMA table_info(exercises)").fetchall()]
+    if "public_slug" not in cols:
+        c.execute("ALTER TABLE exercises ADD COLUMN public_slug TEXT")
+    if "public_lesson" not in cols:
+        c.execute("ALTER TABLE exercises ADD COLUMN public_lesson INTEGER")
 
 
 def _migrate_users(c):
@@ -140,6 +160,7 @@ def init():
         c.executescript(SCHEMA)
         _migrate_users(c)
         c.executescript(MIGRATIONS)
+        _migrate_exercises(c)
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email <> ''")
         c.commit()
     finally:

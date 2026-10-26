@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · LexWay English{% endblock %}
+{% block content %}
+{% include "public/_brand.html" %}
+{% if not slug %}
+<div class="card"><h1>Página não encontrada</h1><p class="muted" style="margin:0">Confira se o link está completo. Se o problema continuar, fale com a gente: {{ SCHOOL_EMAIL }}</p></div>
+{% else %}
+<div class="sheet-head">
+  <div class="row" style="margin-bottom:.4rem"><span class="badge">Exercícios do curso</span></div>
+  <h1 style="margin:0">{{ title }}</h1>
+  <p style="margin:.5rem 0 0">Pratique o que você viu nas aulas. Faça as atividades na ordem, quantas vezes quiser. A correção aparece na hora.</p>
+</div>
+<div class="grid cols-3">
+{% for e in exercises %}
+  <div class="card ex-card">
+    <div class="row"><span class="badge">{{ loop.index }}</span><span class="badge level">{{ e.level }}</span>{% if e.topic %}<span class="badge">{{ e.topic }}</span>{% endif %}</div>
+    <h3>{{ e.title }}</h3>
+    {% if e.description %}<p class="muted" style="margin:0">{{ e.description|truncate(140) }}</p>{% endif %}
+    <div class="foot">
+      <small class="muted">{{ e.n_items }} questões</small>
+      <a class="btn primary" href="/curso/{{ slug }}/{{ e.id }}">Começar →</a>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

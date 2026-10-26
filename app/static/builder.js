@@ -37,6 +37,8 @@
     match: () => ({ prompt: 'Match the columns.', pairs: [{ left: '', right: '' }, { left: '', right: '' }] }),
     group: () => ({ prompt: 'Put the words in the correct group.', categories: ['', ''], words: [{ text: '', category: '' }] }),
     free: () => ({ prompt: '', model_answer: '', keywords: [], min_words: 0, points: 5 }),
+    speak: () => ({ prompt: 'Listen and repeat. Record your voice.', translation: 'Ouça e repita. Grave a sua voz.', phrases: [{ text: '', audio: '' }] }),
+    info: () => ({ prompt: 'Read the text.', translation: 'Leia o texto.', text: '' }),
   };
 
   function field(label, input, hint) {
@@ -89,6 +91,7 @@
     },
     truefalse: it => [h('label', {}, 'Afirmações'), rowsEditor(it.statements, s => [
       h('input', { type: 'text', value: s.text, placeholder: 'Afirmação', oninput: e => { s.text = e.target.value; } }),
+      h('input', { type: 'text', value: s.translation || '', placeholder: 'Tradução (opcional)', oninput: e => { s.translation = e.target.value; } }),
       h('select', { style: 'max-width:130px', onchange: e => { s.answer = e.target.value === 'T'; } },
         h('option', { value: 'T', selected: s.answer }, 'True'), h('option', { value: 'F', selected: !s.answer }, 'False')),
     ], () => ({ text: '', answer: true }), '+ afirmação')],
@@ -131,6 +134,12 @@
       }), 'Dão uma nota provisória automática. Texto livre sempre vai para sua revisão.'),
       field('Mínimo de palavras', h('input', { type: 'number', min: 0, value: it.min_words || 0, oninput: e => { it.min_words = Number(e.target.value); } })),
     ],
+    speak: it => [h('label', {}, 'Palavras ou frases para o aluno falar (cada uma com seu áudio modelo, opcional)'), rowsEditor(it.phrases, p => [
+      h('input', { type: 'text', value: p.text, placeholder: 'Ex.: How do you spell your name?', oninput: e => { p.text = e.target.value; } }),
+      h('input', { type: 'text', value: p.audio || '', placeholder: 'Áudio modelo (link)', style: 'max-width:260px', oninput: e => { p.audio = e.target.value; } }),
+    ], () => ({ text: '', audio: '' }), '+ frase'),
+      h('div', { class: 'hint' }, 'O aluno ouve o modelo, grava a própria voz e compara. Cada frase gravada vale ponto; o navegador também tenta reconhecer a pronúncia (só como retorno ao aluno).')],
+    info: it => [field('Texto', area(it, 'text', 8), 'Aparece uma vez, sem pontos. Use para textos de leitura seguidos de perguntas.')],
   };
 
   function unitCount(it) {
@@ -138,9 +147,11 @@
     if (it.type === 'truefalse') return it.statements.length;
     if (it.type === 'match') return it.pairs.length;
     if (it.type === 'group') return it.words.length;
+    if (it.type === 'speak') return it.phrases.length;
+    if (it.type === 'info') return 0;
     return 1;
   }
-  function pts(it) { return Number(it.points) > 0 ? Number(it.points) : (it.type === 'free' ? 5 : Math.max(1, unitCount(it))); }
+  function pts(it) { if (it.type === 'info') return 0; return Number(it.points) > 0 ? Number(it.points) : (it.type === 'free' ? 5 : Math.max(1, unitCount(it))); }
 
   function render() {
     list.replaceChildren();
@@ -155,8 +166,11 @@
           h('button', { class: 'btn small', type: 'button', title: 'Descer', onclick: () => move(1) }, '↓'),
           h('button', { class: 'btn small', type: 'button', title: 'Duplicar', onclick: () => { ex.items.splice(idx + 1, 0, Object.assign(JSON.parse(JSON.stringify(it)), { id: uid() })); render(); } }, '⧉'),
           h('button', { class: 'btn small danger', type: 'button', onclick: () => { if (confirm('Remover esta questão?')) { ex.items.splice(idx, 1); render(); } } }, 'Remover')),
-        field('Enunciado', area(it, 'prompt', 2)),
+        field('Enunciado (em inglês)', area(it, 'prompt', 2)),
+        field('Tradução do enunciado (aparece logo abaixo)', text(it, 'translation', { placeholder: 'Ex.: Complete as frases.' })),
+        field('Exemplo para o aluno seguir (opcional)', text(it, 'example', { placeholder: 'Ex.: I ___ a student. → I am a student.' })),
         field('Imagem (link, opcional)', text(it, 'image', { type: 'url', placeholder: 'https://…' })),
+        field('Áudio (link, opcional)', text(it, 'audio', { type: 'text', placeholder: 'https://… (mp3/m4a) — para listening' })),
         EDITORS[it.type](it));
       card.addEventListener('input', updateTotal);
       list.append(card);

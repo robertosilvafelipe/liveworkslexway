@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Turmas</h1>
+<div class="grid cols-2">
+  <div class="card">
+    <table class="table">
+      <thead><tr><th>Turma</th><th>Nível</th><th class="num">Alunos</th><th></th></tr></thead>
+      <tbody>
+      {% for c in classes %}
+      <tr>
+        <td><b>{{ c.name }}</b>{% if c.description %}<br><small>{{ c.description }}</small>{% endif %}</td>
+        <td><span class="badge level">{{ c.level }}</span></td>
+        <td class="num"><a href="/teacher/students?class_id={{ c.id }}">{{ c.students }}</a></td>
+        <td class="row" style="justify-content:flex-end">
+          <a class="btn small" href="/teacher/gradebook?class_id={{ c.id }}">Notas</a>
+          <button class="btn small" onclick='editClass({{ c|tojson }})'>Editar</button>
+          <form method="post" action="/teacher/classes/{{ c.id }}/delete" onsubmit="return confirm('Excluir a turma {{ c.name }}?')"><button class="btn small danger">Excluir</button></form>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted">Nenhuma turma ainda.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form class="card" method="post" action="/teacher/classes" id="classForm">
+    <h2 id="classFormTitle">Nova turma</h2>
+    <input type="hidden" name="class_id" value="0">
+    <div class="field"><label>Nome</label><input type="text" name="name" required placeholder="Ex.: A1 — Terça e Quinta 19h"></div>
+    <div class="field"><label>Nível (CEFR)</label><select name="level">{% for l in LEVELS %}<option>{{ l }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Descrição</label><input type="text" name="description"></div>
+    <div class="row"><button class="btn primary">Salvar</button><button type="reset" class="btn ghost" onclick="resetClass()">Limpar</button></div>
+  </form>
+</div>
+<script>
+function editClass(c){const f=document.getElementById('classForm');f.class_id.value=c.id;f.name.value=c.name;f.level.value=c.level;f.description.value=c.description||'';document.getElementById('classFormTitle').textContent='Editar turma';f.name.focus();}
+function resetClass(){const f=document.getElementById('classForm');setTimeout(()=>{f.class_id.value=0;document.getElementById('classFormTitle').textContent='Nova turma';});}
+</script>
+{% endblock %}

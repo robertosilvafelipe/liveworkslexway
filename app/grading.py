@@ -5,7 +5,7 @@ import secrets
 import unicodedata
 
 LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
-SUBJECTS = ["Grammar", "Vocabulary", "Reading", "Writing", "Listening", "Speaking"]
+SUBJECTS = ["Grammar", "Vocabulary", "Reading", "Writing", "Listening", "Speaking", "Video"]
 TYPES = {
     "fill": "Preencher lacunas",
     "dropdown": "Escolher na lista (dropdown)",
@@ -15,6 +15,9 @@ TYPES = {
     "match": "Ligar colunas",
     "group": "Classificar em grupos",
     "free": "Texto livre",
+    "speak": "Falar (gravar a voz)",
+    "info": "Texto de leitura / instruções (sem pontos)",
+    "video": "Vídeo interativo (pausa com perguntas)",
 }
 GRADING = {"best": "Melhor tentativa", "last": "Última tentativa", "average": "Média das tentativas"}
 SHOW_ANSWERS = {
@@ -73,10 +76,18 @@ def units(item) -> int:
         return len(item.get("pairs", []))
     if t == "group":
         return len(item.get("words", []))
+    if t == "speak":
+        return len(item.get("phrases", []))
+    if t == "video":
+        return len(item.get("stops", []))
+    if t == "info":
+        return 0
     return 1
 
 
 def item_points(item) -> float:
+    if item["type"] == "info":
+        return 0.0
     p = item.get("points")
     try:
         if p not in (None, "") and float(p) > 0:
@@ -105,8 +116,16 @@ def validate_items(items):
             iid = "i" + secrets.token_hex(4)
         seen.add(iid)
         c = {"id": iid, "type": t, "prompt": _s(it.get("prompt"), 3000), "image": _s(it.get("image"), 500)}
+        for k in ("translation", "example"):  # Portuguese translation of the command / worked example
+            if _s(it.get(k)):
+                c[k] = _s(it.get(k), 3000)
         if c["image"] and not re.match(r"^https?://", c["image"]):
             raise ValueError(f"Questão {n}: a imagem precisa ser um link http(s).")
+        audio = _s(it.get("audio"), 500)
+        if audio:
+            if not re.match(r"^(https?://|/static/audio/)", audio):
+                raise ValueError(f"Questão {n}: o áudio precisa ser um link http(s).")
+            c["audio"] = audio
         if it.get("points") not in (None, ""):
             try:
                 c["points"] = max(0.5, min(100.0, float(it["points"])))
@@ -136,6 +155,7 @@ def validate_items(items):
             c.update(options=opts, correct=correct)
         elif t == "truefalse":
             sts = [{"text": _s(s.get("text"), 500), "answer": bool(s.get("answer"))}
+                   | ({"translation": _s(s.get("translation"), 500)} if _s(s.get("translation")) else {})
                    for s in it.get("statements", []) if isinstance(s, dict) and _s(s.get("text"))]
             if not sts:
                 raise ValueError(f"Questão {n}: adicione afirmações.")
@@ -148,9 +168,13 @@ def validate_items(items):
             c["alternatives"] = [_s(a, 1000) for a in it.get("alternatives", []) if _s(a, 1000)]
         elif t == "match":
             pairs = [{"left": _s(p.get("left"), 300), "right": _s(p.get("right"), 300)}
+                     | ({"image": _s(p.get("image"), 500)} if _s(p.get("image")) else {})
                      for p in it.get("pairs", []) if isinstance(p, dict) and _s(p.get("left")) and _s(p.get("right"))]
             if len(pairs) < 2:
                 raise ValueError(f"Questão {n}: adicione pelo menos 2 pares.")
+            for p in pairs:  # optional picture shown to the student in place of the right-hand text
+                if p.get("image") and not re.match(r"^(https?://|/static/img/)", p["image"]):
+                    raise ValueError(f"Questão {n}: a figura do par precisa ser um link http(s).")
             c["pairs"] = pairs
         elif t == "group":
             cats = [_s(x, 100) for x in it.get("categories", []) if _s(x, 100)]
@@ -169,6 +193,48 @@ def validate_items(items):
                 c["min_words"] = max(0, int(it.get("min_words") or 0))
             except (TypeError, ValueError):
                 c["min_words"] = 0
+        elif t == "speak":
+            phrases = []
+            for p in it.get("phrases", []):
+                if not isinstance(p, dict) or not _s(p.get("text"), 300):
+                    continue
+                audio = _s(p.get("audio"), 500)
+                if audio and not re.match(r"^(https?://|/static/audio/)", audio):
+                    raise ValueError(f"Questão {n}: o áudio modelo precisa ser um link http(s).")
+                phrases.append({"text": _s(p.get("text"), 300), "audio": audio})
+            if not phrases:
+                raise ValueError(f"Questão {n}: adicione as palavras ou frases que o aluno vai falar.")
+            c["phrases"] = phrases
+        elif t == "video":
+            for k in ("video", "subtitles", "poster"):
+                v = _s(it.get(k), 500)
+                if v and not re.match(r"^(https?://|/static/video/)", v):
+                    raise ValueError(f"Questão {n}: o vídeo precisa ser um link http(s).")
+                if v:
+                    c[k] = v
+            if not c.get("video"):
+                raise ValueError(f"Questão {n}: informe o link do vídeo.")
+            stops = []
+            for s in it.get("stops", []):
+                opts = [_s(o, 300) for o in (s.get("options") or []) if _s(o, 300)] if isinstance(s, dict) else []
+                if len(opts) < 2 or not _s(s.get("question")):
+                    continue
+                try:
+                    at, correct = max(0.0, float(s.get("at", 0))), int(s.get("correct", 0))
+                except (TypeError, ValueError):
+                    raise ValueError(f"Questão {n}: pausa com tempo ou resposta inválida.")
+                if not 0 <= correct < len(opts):
+                    raise ValueError(f"Questão {n}: marque a alternativa correta de cada pausa.")
+                stops.append({"at": at, "question": _s(s.get("question"), 500), "options": opts, "correct": correct}
+                             | ({"translation": _s(s.get("translation"), 500)} if _s(s.get("translation")) else {}))
+            if not stops:
+                raise ValueError(f"Questão {n}: adicione as perguntas das pausas do vídeo.")
+            c["stops"] = sorted(stops, key=lambda s: s["at"])
+        elif t == "info":
+            c["text"] = _s(it.get("text"), 8000)
+            c.pop("points", None)
+            if not c["text"] and not c["prompt"]:
+                raise ValueError(f"Questão {n}: escreva o texto.")
         if not c["prompt"] and t in ("choice", "free"):
             raise ValueError(f"Questão {n}: escreva o enunciado.")
         clean.append(c)
@@ -189,7 +255,8 @@ def _shuffled(seq, avoid=None):
 def student_item(item):
     t = item["type"]
     v = {"id": item["id"], "type": t, "prompt": item.get("prompt", ""), "image": item.get("image", ""),
-         "points": item_points(item)}
+         "audio": item.get("audio", ""), "points": item_points(item),
+         "translation": item.get("translation", ""), "example": item.get("example", "")}
     if t in ("fill", "dropdown"):
         parts = []
         for p in parse_text(item["text"]):
@@ -205,17 +272,29 @@ def student_item(item):
         v["options"] = item["options"]
     elif t == "truefalse":
         v["statements"] = [s["text"] for s in item["statements"]]
+        v["statement_translations"] = [s.get("translation", "") for s in item["statements"]]
     elif t == "order":
         v["tokens"] = _shuffled(item["tokens"], avoid=item["tokens"])
     elif t == "match":
         v["left"] = [p["left"] for p in item["pairs"]]
         rights = [p["right"] for p in item["pairs"]]
         v["right"] = _shuffled(rights, avoid=rights)
+        images = {p["right"]: p["image"] for p in item["pairs"] if p.get("image")}
+        if images:
+            v["right_images"] = [images.get(r, "") for r in v["right"]]
     elif t == "group":
         v["categories"] = item["categories"]
         v["words"] = _shuffled([w["text"] for w in item["words"]])
     elif t == "free":
         v["min_words"] = item.get("min_words", 0)
+    elif t == "speak":
+        v["phrases"] = item["phrases"]
+    elif t == "info":
+        v["text"] = item.get("text", "")
+    elif t == "video":
+        v.update(video=item["video"], subtitles=item.get("subtitles", ""), poster=item.get("poster", ""),
+                 stops=[{"at": s["at"], "question": s["question"], "translation": s.get("translation", ""),
+                         "options": s["options"]} for s in item["stops"]])
     return v
 
 
@@ -254,7 +333,8 @@ def grade_item(item, answer):
             g = given[i] if i < len(given) else None
             ok = isinstance(g, bool) and g == s["answer"]
             ok_units += ok
-            details.append({"statement": s["text"], "given": g, "expected": s["answer"], "ok": ok})
+            details.append({"statement": s["text"], "translation": s.get("translation", ""), "given": g,
+                            "expected": s["answer"], "ok": ok})
     elif t == "order":
         given = [str(x) for x in answer] if isinstance(answer, list) else []
         sentence = " ".join(given)
@@ -264,11 +344,13 @@ def grade_item(item, answer):
         details.append({"given": sentence, "expected": " ".join(item["tokens"]), "ok": ok})
     elif t == "match":
         given = answer if isinstance(answer, list) else []
+        images = {norm(p["right"]): p.get("image", "") for p in item["pairs"]}
         for i, p in enumerate(item["pairs"]):
             g = given[i] if i < len(given) and given[i] is not None else ""
             ok = norm(g) == norm(p["right"])
             ok_units += ok
-            details.append({"left": p["left"], "given": str(g), "expected": p["right"], "ok": ok})
+            details.append({"left": p["left"], "given": str(g), "expected": p["right"], "ok": ok,
+                            "given_image": images.get(norm(g), ""), "expected_image": p.get("image", "")})
     elif t == "group":
         pool = [dict(w, used=False) for w in item["words"]]
         given = answer if isinstance(answer, list) else []
@@ -301,6 +383,32 @@ def grade_item(item, answer):
         needs_review = bool(text.strip())
         details.append({"given": text, "expected": item.get("model_answer", ""), "ok": None,
                         "keywords_found": found, "keywords": kws, "words": words})
+
+    elif t == "speak":
+        # practice by imitation: each phrase counts once the student has recorded it.
+        # "heard" is what the browser's speech recognition understood (feedback only, when available).
+        given = answer if isinstance(answer, list) else []
+        for i, p in enumerate(item["phrases"]):
+            g = given[i] if i < len(given) and isinstance(given[i], dict) else {}
+            heard = str(g.get("heard") or "")[:300]
+            ok = bool(g.get("recorded"))
+            ok_units += ok
+            details.append({"text": p["text"], "recorded": ok, "heard": heard,
+                            "match": bool(heard) and norm_loose(heard) == norm_loose(p["text"]), "ok": ok})
+
+    elif t == "video":
+        # interactive video: one multiple-choice question at each pause
+        given = answer if isinstance(answer, list) else []
+        for i, s in enumerate(item["stops"]):
+            try:
+                g = int(given[i]) if i < len(given) and given[i] is not None else None
+            except (TypeError, ValueError):
+                g = None
+            ok = g == s["correct"]
+            ok_units += ok
+            details.append({"statement": s["question"], "translation": s.get("translation", ""), "at": s["at"],
+                            "given": s["options"][g] if g is not None and 0 <= g < len(s["options"]) else "",
+                            "expected": s["options"][s["correct"]], "ok": ok})
 
     points = item_points(item)
     score = round(points * (ok_units / n_units), 2) if n_units else 0.0
